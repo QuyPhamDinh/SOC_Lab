@@ -8,10 +8,10 @@ Two SOC Simulator alerts from the same incident on host `win-3450` / user `micha
 ## Alerts
 
 1. **Suspicious Email Attachment** — phishing email → `invoice.pdf.lnk` → PowerShell → `powercat.ps1` → C2 over ngrok
-   🔗 [link to alert-summary]
+   🔗 [C2 Activity](alert-malicious-attachment-importantInvoice-febrary.md)
 
 2. **DNS Exfiltration & Suspicious Data Collection** — financial files staged from a mapped network share, zipped, and exfiltrated via base64-encoded DNS queries to `haz4rdw4re.io`
-   🔗 [link to dns-exfiltration write-up]
+   🔗 [DNS Exfiltration](alert-dns-exfiltration.md)
 
 ## Why they're grouped
 
