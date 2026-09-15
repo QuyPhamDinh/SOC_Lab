@@ -14,7 +14,7 @@ tags: [triage, exfiltration, dns, powershell, sysmon]
 
 ## Alert
 
-![alt text](alert-dns-exfiltration/alert-triggered.png)
+![alt text](alert-dns-exfiltration-media/alert-triggered.png)
 
 ```yaml
 datasource: sysmon
@@ -34,7 +34,7 @@ event.action: Process Create (rule: ProcessCreate)
 
 ### Step 1 — Confirm the process chain and command-line execution for parent PID 3728
 
-![alt text](alert-dns-exfiltration/dns-base-exfiltration.png)
+![alt text](alert-dns-exfiltration-media/dns-base-exfiltration.png)
 
 **Findings:** The attacker mapped a sensitive network share of financial records using `net use Z: \\FILESRV-01\SSF-FinancialRecords`. Exactly one minute later, they cleaned up their tracks by deleting the network drive mapping (`net use Z: /delete`). Following this, repeated nslookup queries were executed against the external domain `haz4rdw4re.io`, indicating a DNS-based data exfiltration pattern.
 
@@ -45,7 +45,7 @@ event.action: Process Create (rule: ProcessCreate)
 host.name="win-3450" event.code=11 "*exfiltration*"
 ```
 
-![alt text](alert-dns-exfiltration/sesitive-data-collected.png)
+![alt text](alert-dns-exfiltration-media/sesitive-data-collected.png)
 
 **Findings:** Files `InvestorPresentation2023.ppt` and `ClientPortfolioSummary.xlsx` were created and subsequently compressed into `exfilt8me.zip` within the exfiltration directory. This activity occurred between `2026-08-27 17:08:08.849` and `2026-08-27 17:09:06.849`—precisely matching the window when the network share was mapped to Z: and subsequently cleaned up.
 
@@ -55,7 +55,7 @@ host.name="win-3450" event.code=11 "*exfiltration*"
 ```
 index=* process.command_line="*haz4rdw4re.io*" | stats count by host.name
 ```
-![alt text](alert-dns-exfiltration/scope.png)
+![alt text](alert-dns-exfiltration-media/scope.png)
 **Findings:** At the time of analysis, communication and DNS requests targeting `haz4rdw4re.io` were isolated exclusively to `win-3450`.
 
 ## Case Report
