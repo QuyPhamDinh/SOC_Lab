@@ -27,10 +27,10 @@ Extracted → `invoice.pdf.lnk`. Double extension = shortcut posing as a PDF. Se
 
 ![alt text](malicious-attachment-importantInvoice-febrary-media/pivot-filename-search.png)
 
-**Pivot 2 — who opened it?**
-Filename hit on `10.10.70.59`, `Explorer.EXE`, `process.pid = 3180`. That's the user double-clicking it, so execution is confirmed — not just delivery.
+**Findings**
+Filename hit on `10.10.70.59`, `Explorer.EXE`, `process.pid = 3180`
 
-**Pivot 3 — what did it spawn?**
+**Pivot 2 — what did it spawn?**
 Pivoted on PID 3180 for child processes → PowerShell downloading `powercat.ps1` from GitHub, then an outbound PowerShell connection to `2.tcp.ngrok.io:19282`. `process.pid = 3880`.
 
 
@@ -45,7 +45,6 @@ Download of an offensive tool + ngrok tunnel = reverse shell / C2. Chain is comp
 ![alt text](malicious-attachment-importantInvoice-febrary-media/report1.png)
 ![alt text](malicious-attachment-importantInvoice-febrary-media/report2.png)
 
-Escalated for isolation. Remediation: isolate host, kill PowerShell/powercat and remove payloads, block sender domain and C2.
 
 ## Lesson learned
 
