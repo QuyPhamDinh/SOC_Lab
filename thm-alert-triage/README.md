@@ -1,18 +1,14 @@
-# Phishing → C2 → DNS Exfiltration — Incident Write-Up
+# Alert Triage Portfolio
 
-Two SOC Simulator alerts from the same incident on host `win-3450` / user `michael.ascot`, triaged separately but chained together: a phishing email led to C2 access, which was then used to stage and exfiltrate sensitive files over DNS.
+Index of SOC Simulator alerts triaged, with brief description and verdict.
 
-**Verdict (both):** True Positive
-**Date:** 2026-08-27
+| Alert | Host | Verdict | Description |
+|---|---|---|---|
+| [Suspicious Parent-Child Relationship](alert-false-positive-parent-child-win-3459.md) | win-3459 | False Positive | `services.exe` spawning `TrustedInstaller.exe` — standard Windows servicing behavior, no downstream child processes or network activity. |
+| [Suspicious Email Attachment](alert-malicious-attachment-importantInvoice-febrary.md) | win-3450 | True Positive | Phishing email delivered `invoice.pdf.lnk`, which launched PowerShell to pull `powercat.ps1` and establish C2 over ngrok. |
+| [DNS Exfiltration & Suspicious Data Collection](alert-dns-exfiltration.md) | win-3450 | True Positive | Financial files staged from a mapped network share, zipped, and exfiltrated via base64-encoded DNS queries to `haz4rdw4re.io`. Chained from the C2 access above. |
 
-## Alerts
 
-1. **Suspicious Email Attachment** — phishing email → `invoice.pdf.lnk` → PowerShell → `powercat.ps1` → C2 over ngrok
-   🔗 [C2 Activity](alert-malicious-attachment-importantInvoice-febrary.md)
+## Related Incident
 
-2. **DNS Exfiltration & Suspicious Data Collection** — financial files staged from a mapped network share, zipped, and exfiltrated via base64-encoded DNS queries to `haz4rdw4re.io`
-   🔗 [DNS Exfiltration](alert-dns-exfiltration.md)
-
-## Why they're grouped
-
-The C2 channel established in alert 1 is what gave the attacker hands-on-keyboard access to mount the network share, stage files, and run the DNS exfiltration in alert 2 — same host, same user, same session. Read them in order for the full attack chain.
+The **Suspicious Email Attachment** and **DNS Exfiltration** alerts above are part of the same attack chain on `win-3450` / `michael.ascot` — phishing → C2 access → file staging and exfiltration. See the [incident write-up](incident-writeup-win-3450.md) for the full chain.
