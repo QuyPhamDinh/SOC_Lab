@@ -62,8 +62,8 @@ Four PIRs, each mapped to a specific ATT&CK technique, an area of interest on th
 |---|-----|-------------------|-------------------|----------------|
 | 1 | Evidence of compromised accounts | T1078 – Valid Accounts | VPN Server, Domain Controllers | Anomalous/foreign source IPs, off-hour logons, Event IDs 4624/4625/4634, 4768/4769/4771, 4740, 4776 |
 | 2 | Evidence of unauthorized account creation | T1136 – Create Account | Domain Controllers | Event ID 4720 (creation) with unfamiliar username/timing, 4722 (enable), 4728/4732/4756 (added to privileged group), 4738 (modified) |
-| 3 | Evidence of Ingress Tool Transfer | T1105 | SW LAN / Engineering Server / Drone OS Server | Sysmon Process Creation (1), PowerShell Script Block Logging (4104) showing unexpected outbound connections, Sysmon Network Connect (3) to unusual IP/domain, Sysmon File Create (11) immediately following |
-| 4 | Exploitation of Ivanti Connect Secure | T1190 | Ivanti Connect Secure appliance | Path-traversal (`../`) and command-injection syntax in requests, malformed JSON POSTs to `/api/v1/*`, unrecognized/modified files in web-accessible directories |
+| 3 | Evidence of Ingress Tool Transfer | T1105 — Ingress Tool Transfer | SW LAN / Engineering Server / Drone OS Server | Sysmon Process Creation (1), PowerShell Script Block Logging (4104) showing unexpected outbound connections, Sysmon Network Connect (3) to unusual IP/domain, Sysmon File Create (11) immediately following |
+| 4 | Exploitation of Ivanti Connect Secure | T1190 -Exploit Public-Facing Application | Ivanti Connect Secure appliance | Path-traversal (`../`) and command-injection syntax in requests, malformed JSON POSTs to `/api/v1/*`, unrecognized/modified files in web-accessible directories |
 
 **PIR 4 detail** — this is the one most directly tied to AA24-038A's LOTL narrative, since it's the initial-access step everything else in the hypothesis depends on:
 
