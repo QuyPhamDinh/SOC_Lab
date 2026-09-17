@@ -14,11 +14,22 @@ DroneSwarm Technologies Inc. is a fictional U.S. drone R&D firm with contracts t
 This plan works backward from that hypothesis: terrain analysis identifies *where* an actor like Volt Typhoon would need to go, an ATT&CK overlay identifies *how*, and four Priority Intelligence Requirements (PIRs) turn both into concrete log sources and detection logic.
 
 ---
+## Contents
+
+- [Scenario](#scenario)
+- [Terrain Analysis](#terrain-analysis)
+  - [AOA #1 — Exploit VPN Appliance (T1190)](#avenue-of-approach-1--exploit-vpn-appliance-t1190)
+  - [AOA #2 — Use Compromised Legitimate Account (T1078 + T1133)](#avenue-of-approach-2--use-compromised-legitimate-account-t1078--t1133)
+- [ATT&CK Navigator Overlay](#attck-navigator-overlay)
+- [Priority Intelligence Requirements (PIRs)](#priority-intelligence-requirements-pirs)
+- [Full Deliverable](#full-deliverable)
+
+---
+
 
 ## Terrain Analysis
 
 Network map with mission-critical assets and areas of interest highlighted, annotated with two additional avenues of approach (AOAs) aligned to Volt Typhoon's known tradecraft:
-![alt text](image.png)
 
 ![DroneSwarm network overlay with terrain analysis](images/network-overlay-1.png)
 
