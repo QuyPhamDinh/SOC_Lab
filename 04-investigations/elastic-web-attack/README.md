@@ -10,11 +10,11 @@
 
 I investigated five related alerts involving `winserv2019.some.corp`. Starting with suspicious POST requests from `203.0.113.55`, I pivoted through web logs, Windows authentication events, process activity, and account-management events to reconstruct the attack sequence.
 
-The evidence shows requests to `/ecp/proxyLogon.ecp`, followed by command-bearing requests to `/errorEE.aspx`. Later activity included an Administrator logon, creation of `svc_backup`, commands adding that account to privileged groups, and a WinRAR command targeting user documents and administrative scripts. The original investigation notes also recorded a scheduled-task command and an LSASS dumping command submitted through the suspected web shell.
+The evidence shows requests to `/ecp/proxyLogon.ecp`, followed by command-bearing requests to `/errorEE.aspx`. Later activity included a confirmed Administrator RDP logon from the same source IP (`203.0.113.55`), creation of `svc_backup`, commands adding that account to privileged groups, and a WinRAR command targeting user documents and administrative scripts. The original investigation notes also recorded a scheduled-task command and an LSASS dumping command submitted through the suspected web shell.
 
-Taken together, these findings support a true-positive verdict and urgent escalation. The supplied evidence does not establish the exact exploit, successful credential extraction, the method used for the Administrator logon, or completed data exfiltration.
+Taken together, these findings support a true-positive verdict and urgent escalation. The supplied evidence does not establish the exact exploit, successful credential extraction, how the Administrator credentials were obtained, or completed data exfiltration.
 
-> **Evidence scope:** This write-up is based on the supplied investigation notes and 16 screenshots, not a fresh search of the underlying logs. Times follow the supplied Elastic displays; confirm the display timezone before correlating with other systems. Response actions below are recommendations, not actions performed in this lab.
+> **Evidence scope:** This write-up is based on the supplied investigation notes, 17 screenshots, and the user-provided Event 4624 JSON result, not a fresh search of the underlying logs. Times follow the supplied Elastic displays. The supplied Event 4624 JSON explicitly confirms its timestamp as 2025-07-20T05:11:22.545Z (UTC); verify display timezone settings when correlating other screenshots. Use the event timestamp rather than the September ingestion dates to place this logon in the timeline. Response actions below are recommendations, not actions performed in this lab.
 
 ## Contents
 
@@ -25,7 +25,6 @@ Taken together, these findings support a true-positive verdict and urgent escala
 - [Verdict and evidence gaps](#verdict-and-evidence-gaps)
 - [Recommended response](#recommended-response)
 - [Lessons learned](#lessons-learned)
-- [Evidence index](#evidence-index)
 
 ## Alert overview
 
@@ -52,8 +51,8 @@ All entries below are on **July 20, 2025**. This sequence correlates events; it 
 | 04:48:24 | Scheduled-task creation command | Notes record a `WinUpdate` task intended to contact the source IP every five minutes; task creation success is unconfirmed. |
 | 04:50:43–04:51:52 | Service and file-system discovery | Requests include service enumeration and a search of `C:\inetpub`. |
 | 04:58:20–05:05:17 | Suspected credential-access attempt | Notes record `Get-Process lsass` and a `comsvcs.dll` memory-dump command; successful dumping is unconfirmed. |
-| 05:11:22.545 | Administrator authentication | Event 4624 confirms a successful logon on the affected host. |
-| 05:11:27–05:12:59 | Desktop processes and command prompt | Notes describe `userinit.exe`, `explorer.exe`, and then `cmd.exe`; logon method remains unverified. |
+| 05:11:22.545 UTC | Administrator RDP logon from the web-attack source IP | Event 4624, Logon Type 10, confirms `SOME\Administrator` logged on remotely from `203.0.113.55`. |
+| 05:11:27–05:12:59 | Desktop processes and command prompt | Notes describe `userinit.exe`, `explorer.exe`, and then `cmd.exe` after the confirmed RDP logon; correlate session identifiers to associate these processes definitively. |
 | 05:13:09–05:13:10 | Creation of `svc_backup` | Notes record a domain-account creation command; the Security screenshot shows Event 4720 at 05:13:10.009. |
 | 05:13:15–05:13:28 | Group membership changes | Three `net.exe` commands are followed by Event 4732 records. |
 | 05:17:55.918 | Archive command targeting documents and scripts | `Rar.exe` is launched with output path `C:\Temp\finance_it_archive.rar`; archive completion and outbound transfer are unconfirmed. |
@@ -67,6 +66,8 @@ All entries below are on **July 20, 2025**. This sequence correlates events; it 
 ![Web Requests Indicating File Upload](media/02-web-upload-alert.png)
 
 **Investigation objective:** Review POST requests from the alert’s client IP to identify the targeted resource and request pattern.
+
+**ProxyLogon context:** `/ecp/proxyLogon.ecp` is an internal backend endpoint of the **Exchange Control Panel (ECP)** used for authentication between proxied Exchange components. In the ProxyLogon exploit chain, **CVE-2021-26855**, a server-side request forgery (SSRF) vulnerability, enables requests to backend endpoints. Attackers can abuse the authentication endpoint to obtain an authenticated ECP session, then chain additional vulnerabilities to deploy a web shell. This makes the observed requests relevant to suspected Exchange exploitation, although the path alone does not confirm the full exploit chain. [Technical reference: ProxyLogon root-cause analysis](https://googleprojectzero.github.io/0days-in-the-wild/0day-RCAs/2021/CVE-2021-26855.html).
 
 I filtered the web logs for POST requests from the alert's client IP.
 
@@ -142,13 +143,27 @@ I investigated the out-of-hours Administrator alert with the following recorded 
 @timestamp >= "2025-07-20T05:11:22" and winlog.event_id:4624 and host.name:winserv2019.some.corp and winlog.event_data.TargetUserName:Administrator
 ```
 
-**Observed:** One matching Event 4624 appears at **05:11:22.545**, confirming successful authentication on the affected host.
+![Successful Administrator RDP logon showing the source IP and RemoteInteractive logon type](media/17-administrator-rdp-logon-details.png)
 
-![Successful Administrator logon](media/09-administrator-logon.png)
+**Observed:** The updated screenshot and supplied JSON confirm one successful **RDP / RemoteInteractive logon** to `winserv2019.some.corp` at **05:11:22.545 UTC**, using `SOME\Administrator` from **`203.0.113.55`**.
 
-The notes describe desktop startup processes followed by `explorer.exe` spawning `cmd.exe` at 05:12:59. This supports an interactive session, but the supplied 4624 screenshot does not expose the logon type, source address, or authentication details.
+| Event field | Value | Interpretation |
+|---|---|---|
+| `@timestamp` | `2025-07-20T05:11:22.545Z` | Time of the logon event, in UTC |
+| `winlog.event_id` | `4624` | Successful logon |
+| Target account | `SOME\Administrator` | Account that logged on, distinct from the subject account `WINSERV2019$` |
+| `winlog.event_data.LogonType` | `10` | RemoteInteractive / RDP logon |
+| `winlog.event_data.IpAddress` | `203.0.113.55` | Same source IP as the earlier POST and web-shell requests |
+| `winlog.event_data.IpPort` | `3389` | Recorded **source port**, not evidence of the destination port |
+| `winlog.event_data.ElevatedToken` | `Yes` | Session has an elevated token; this does not establish a privilege-escalation exploit |
+| `winlog.event_data.AuthenticationPackageName` | `Negotiate` | Does not alone establish whether Kerberos or NTLM was ultimately used |
+| `winlog.record_id` | `17166` | Security event record reference |
 
-**Assessment:** The timing and subsequent account changes make this logon suspicious. It is not yet established that it used credentials obtained from LSASS. RDP access also remains unconfirmed. An existing Administrator account logging on is not, by itself, proof of privilege escalation.
+**Assessment:** The matching source IP and affected host confirm a shared network source between the earlier web activity and this Administrator RDP logon. Combined with the timing and subsequent account changes, this strongly supports treating the logon as part of the same attack sequence. The evidence does not prove that the Administrator credentials came from the earlier LSASS dumping attempt.
+
+Logon Type **10** is the basis for identifying RDP access. In Event 4624, `IpPort` describes the source port, so the displayed value `3389` should not be relabeled as a destination port. [Microsoft Event 4624 field documentation](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4624).
+
+
 
 ### 4. Investigate account creation
 
@@ -234,7 +249,7 @@ These values are investigation pivots from the lab, not independently reputation
 
 | Type | Value | Context |
 |---|---|---|
-| Client IP / callback target | `203.0.113.55` | Web requests and the recorded scheduled-task callback |
+| Web client / RDP source / callback target | `203.0.113.55` | Shared source for web requests and the confirmed Administrator RDP logon; also the recorded scheduled-task callback target |
 | Affected host | `winserv2019.some.corp` | Common host across the alert sequence |
 | Privileged account | `SOME\Administrator` | Account described in the notes; Administrator authentication and command activity |
 | Newly created account | `svc_backup` | Account creation and privileged group additions |
@@ -247,7 +262,7 @@ These values are investigation pivots from the lab, not independently reputation
 
 ## Verdict and evidence gaps
 
-**Classification: True positive.** The command-bearing web requests, closely timed Administrator activity, account creation, privileged group changes, and archive command form a coherent malicious sequence in this lab. I would recommend critical-priority escalation because the activity involves privileged access and potential credential and data exposure.
+**Classification: True positive.** The command-bearing web requests, confirmed Administrator RDP logon from the same source IP, account creation, privileged group changes, and archive command form a coherent malicious sequence in this lab. I would recommend critical-priority escalation because the activity involves privileged access and potential credential and data exposure.
 
 An automated user agent, an out-of-hours logon, or an archiving tool can each be benign in isolation. The correlated behavior is the basis for this verdict. In a live investigation, validate change records and authorized administrative activity as part of triage.
 
@@ -256,7 +271,7 @@ An automated user agent, an out-of-hours logon, or an archiving tool can each be
 | Suspected exploitation and web-shell use | Exact vulnerability, uploaded file contents, and command outputs are not supplied. |
 | Scheduled-task persistence attempt | Full command is retained in notes; task creation and callbacks are not confirmed. |
 | Suspected LSASS dumping attempt | Recorded in notes; dump creation and credential extraction are not confirmed. |
-| Successful Administrator authentication | Event 4624 is visible; source, logon type, and relationship to credential dumping remain unresolved. |
+| Confirmed Administrator RDP logon from the web-attack source | Event 4624 confirms Logon Type 10 and source `203.0.113.55`; how credentials were obtained and any link to LSASS dumping remain unresolved. |
 | Account creation and privileged group changes | Supported by notes, commands, and matching event timing; expand events to verify account and group SIDs. |
 | Potential data staging | Archive command is visible; completed archive creation and exfiltration are not confirmed. |
 | Known scope | One identified host; broader compromise has not been established. |
