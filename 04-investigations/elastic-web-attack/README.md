@@ -14,7 +14,7 @@ The evidence shows requests to `/ecp/proxyLogon.ecp`, followed by command-bearin
 
 Taken together, these findings support a true-positive verdict and urgent escalation. The supplied evidence does not establish the exact exploit, successful credential extraction, the method used for the Administrator logon, or completed data exfiltration.
 
-> **Evidence scope:** This write-up is based on the supplied investigation notes and 15 screenshots, not a fresh search of the underlying logs. Times follow the supplied Elastic displays; confirm the display timezone before correlating with other systems. Response actions below are recommendations, not actions performed in this lab.
+> **Evidence scope:** This write-up is based on the supplied investigation notes and 16 screenshots, not a fresh search of the underlying logs. Times follow the supplied Elastic displays; confirm the display timezone before correlating with other systems. Response actions below are recommendations, not actions performed in this lab.
 
 ## Contents
 
@@ -34,7 +34,7 @@ Taken together, these findings support a true-positive verdict and urgent escala
 | 04:38:40 | Web Requests Indicating File Upload | High | SOC-20250720-0012 |
 | 04:45:31 | GET Requests to ASPX File with Query Parameters | High | SOC-20250720-0013 |
 | 05:11:22 | Administrator Access Outside of Business Hours | High | SOC-20250720-0014 |
-| 05:13 — minute shown in alert list | New User Account Created | Critical | Not shown in supplied evidence |
+| 05:13:10 | New User Account Created | Critical | SOC-20250720-0015 |
 | 05:13:15 | Unusual Command-Line Behavior: Privilege Changes | Critical | SOC-20250720-0016 |
 
 The first two alerts identify `203.0.113.55` as the client and `winserv2019.some.corp` as the destination. The later alert cards identify the same host and the `Administrator` account.
@@ -62,6 +62,12 @@ All entries below are on **July 20, 2025**. This sequence correlates events; it 
 
 ### 1. Validate the suspicious web requests
 
+**Alert:** Web Requests Indicating File Upload
+
+![Web Requests Indicating File Upload](media/02-web-upload-alert.png)
+
+**Investigation objective:** Review POST requests from the alert’s client IP to identify the targeted resource and request pattern.
+
 I filtered the web logs for POST requests from the alert's client IP.
 
 ```kql
@@ -75,6 +81,12 @@ _index:weblogs and client.ip:203.0.113.55 and http.request.method:"POST"
 ![POST requests targeting the proxyLogon endpoint](media/03-post-request-results.png)
 
 ### 2. Investigate the suspected web shell
+
+**Alert:** GET Requests to ASPX File with Query Parameters
+
+![GET Requests to ASPX File with Query Parameters](media/04-aspx-command-alert.png)
+
+**Investigation objective:** Inspect the commands supplied to the ASPX endpoint and identify follow-on activity.
 
 The next alert reported GET requests to `errorEE.aspx` containing a `cmd=` parameter. I pivoted to those requests.
 
@@ -118,6 +130,12 @@ This is an attempted memory dump targeting PID 580, described in the notes as LS
 
 ### 3. Correlate the Administrator logon
 
+**Alert:** Administrator Access Outside of Business Hours
+
+![Administrator Access Outside of Business Hours](media/08-administrator-alert.png)
+
+**Investigation objective:** Validate the successful logon and correlate it with subsequent process and account activity.
+
 I investigated the out-of-hours Administrator alert with the following recorded query:
 
 ```kql
@@ -133,6 +151,14 @@ The notes describe desktop startup processes followed by `explorer.exe` spawning
 **Assessment:** The timing and subsequent account changes make this logon suspicious. It is not yet established that it used credentials obtained from LSASS. RDP access also remains unconfirmed. An existing Administrator account logging on is not, by itself, proof of privilege escalation.
 
 ### 4. Investigate account creation
+
+**Alert:** New User Account Created
+
+![New User Account Created](media/16-new-user-account-alert.jpg)
+
+**Investigation objective:** Identify the newly created account and correlate its creation with the Administrator session.
+
+The alert identifies **Administrator** on `winserv2019.some.corp` at **05:13:10.000**, with Critical severity and alert ID **SOC-20250720-0015**. Its trigger reports that a new user was created; the alert card does not identify the new username.
 
 The notes record this command at approximately **05:13:09**:
 
@@ -153,6 +179,12 @@ I then reviewed Security account-management events:
 ![Account-management events following the creation command](media/10-account-management-events.png)
 
 ### 5. Validate privilege changes
+
+**Alert:** Unusual Command-Line Behavior: Privilege Changes
+
+![Unusual Command-Line Behavior: Privilege Changes](media/11-privilege-change-alert.png)
+
+**Investigation objective:** Determine which groups were targeted and correlate the commands with membership-change events.
 
 I searched for commands launched from `cmd.exe` by `Administrator`:
 
@@ -181,6 +213,8 @@ Each command is followed closely by an Event 4732 record, supporting successful 
 **Assessment:** This sequence supports privileged-account persistence. The new account gains privileges; the already privileged Administrator session does not need to escalate simply to issue these commands.
 
 ### 6. Identify potential data staging
+
+**Follow-on pivot:** This activity was discovered while investigating the privilege-change alert; no separate archive alert was supplied.
 
 The broader query also revealed `Rar.exe`, launched from `cmd.exe` at **05:17:55.918**. The visible command line is:
 
@@ -247,27 +281,3 @@ For escalation, include the affected host and accounts, timeline, saved queries,
 - Correlate group-change commands with Event 4732 and verify the member and group fields rather than relying only on timing.
 - Treat file archiving as potential staging until file and network evidence establish what happened next.
 - Record a bounded time range, timezone, host, and relevant account identifiers when reproducing searches. The queries above preserve the original investigation searches and were not rerun for this write-up.
-
-## Evidence index
-
-All 15 supplied screenshots are retained with descriptive filenames. The main narrative embeds the most useful views; supporting screenshots are linked below.
-
-| Original file | Reorganized evidence | Description |
-|---|---|---|
-| `image.png` | [01-alert-overview.png](media/01-alert-overview.png) | Five-alert queue |
-| `image-1.png` | [02-web-upload-alert.png](media/02-web-upload-alert.png) | Initial POST-request alert |
-| `image-4.png` | [03-post-request-results.png](media/03-post-request-results.png) | Three POST requests |
-| `image-2.png` | [04-aspx-command-alert.png](media/04-aspx-command-alert.png) | ASPX command-parameter alert |
-| `image-3.png` | [05-web-shell-discovery.png](media/05-web-shell-discovery.png) | Command-bearing GET requests |
-| `image-5.png` | [06-web-shell-follow-on.png](media/06-web-shell-follow-on.png) | Task, service, and file-system commands |
-| `image-6.png` | [07-discovery-detail.png](media/07-discovery-detail.png) | Additional discovery view |
-| `image-7.png` | [08-administrator-alert.png](media/08-administrator-alert.png) | Out-of-hours Administrator alert |
-| `image-9.png` | [09-administrator-logon.png](media/09-administrator-logon.png) | Successful-logon event |
-| `image-8.png` | [10-account-management-events.png](media/10-account-management-events.png) | Account creation and related events |
-| `image-11.png` | [11-privilege-change-alert.png](media/11-privilege-change-alert.png) | Critical privilege-change alert |
-| `image-13.png` | [12-group-change-commands.png](media/12-group-change-commands.png) | Three group-add commands |
-| `image-12.png` | [13-group-event-correlation.png](media/13-group-event-correlation.png) | Commands correlated with Event 4732 |
-| `image-14.png` | [14-group-events-and-archive.png](media/14-group-events-and-archive.png) | Correlation results and full archive command |
-| `image-10.png` | [15-duplicate-administrator-alert.png](media/15-duplicate-administrator-alert.png) | Duplicate Administrator alert; originally mislabeled as the new-account alert |
-
-**Repository layout:** Keep this `README.md` alongside the `media/` directory so all relative image and evidence links resolve on GitHub.
