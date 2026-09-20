@@ -14,8 +14,6 @@ The evidence shows requests to `/ecp/proxyLogon.ecp`, followed by command-bearin
 
 Taken together, these findings support a true-positive verdict and urgent escalation. The supplied evidence does not establish the exact exploit, successful credential extraction, how the Administrator credentials were obtained, or completed data exfiltration.
 
-> **Evidence scope:** This write-up is based on the supplied investigation notes, 17 screenshots, and the user-provided Event 4624 JSON result, not a fresh search of the underlying logs. Times follow the supplied Elastic displays. The supplied Event 4624 JSON explicitly confirms its timestamp as 2025-07-20T05:11:22.545Z (UTC); verify display timezone settings when correlating other screenshots. Use the event timestamp rather than the September ingestion dates to place this logon in the timeline. Response actions below are recommendations, not actions performed in this lab.
-
 ## Contents
 
 - [Alert overview](#alert-overview)
