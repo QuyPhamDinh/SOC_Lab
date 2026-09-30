@@ -37,57 +37,32 @@ Otherwise: <disposition — monitor / close as benign / tune>
 
 ## 1. PowerShell — Suspicious Parent Process
 
-**MITRE ATT&CK:** T1059.001, T1204
-**Trigger:** PowerShell/`pwsh` spawned from `w3wp.exe`, `httpd.exe`, `nginx.exe`, Office apps, `wmiprvse.exe`, or `sqlserver.exe` — see `detections.md` #1
-**Data source:** Sysmon Event ID 1
+**MITRE ATT&CK:** T1059.001, T1204 **Trigger:** PowerShell/`pwsh` spawned from `w3wp.exe`, `httpd.exe`, `nginx.exe`, Office apps, `wmiprvse.exe`, or `sqlserver.exe` — see `detections.md` #1 **Data source:** Sysmon Event ID 1
 
 ### Triage Steps
-1. Pull `ParentImage`, `ParentCommandLine`, `Image`, `CommandLine`, and `User` from the alert.
+
+1. Pull hostname, timestamp, `ParentImage`, `ParentCommandLine`, `Image`, `CommandLine`, `User`, `ProcessGuid`, and `ParentProcessGuid` from the alert. Retrieve executable hashes and signature information where available.
 2. Check whether the parent process is a known automation/EDR agent on this specific host (cross-reference the host's software baseline).
 3. If the parent is an Office app: check for a recently opened document and whether macros were enabled around the same timestamp.
 4. If the parent is a web server process: check web server access/error logs for the same time window for signs of a web shell drop.
-5. Pivot on the resulting `ProcessId` for child processes spawned by the PowerShell instance.
+5. Read the complete PowerShell command line. Safely decode encoded commands without executing them, inspect referenced scripts, and review PowerShell 4104/4103 logs where enabled for suspicious behavior.
+6. Pivot on the PowerShell `ProcessGuid` for related network connections and file activity where collected. Find child processes whose `ParentProcessGuid` matches this `ProcessGuid`. If using `ProcessId`, constrain the search by host and process lifetime to avoid PID reuse.
+7. Scope the activity across other hosts and users for the same command, script/file hash, destination IP/domain, document, or process chain. Check related alerts and persistence activity around the same timestamp, then expand the time window as needed.
 
 ### False-Positive Checks
+
 - Known patch-management or EDR agents that legitimately spawn PowerShell from these parents on this host.
 - Scheduled maintenance scripts using WMI (`wmiprvse.exe`) at predictable intervals.
 
 ### Escalation Threshold
-Escalate if: the PowerShell command line contains encoded commands, download cradles, or network connections, **or** the parent process has no known legitimate reason to spawn a shell on this host.
-Otherwise: document as known-good parent/child pair and add to the host's allowlist.
+
+Escalate if: the PowerShell command line contains encoded commands, download cradles, or network connections, **or** the parent process has no known legitimate reason to spawn a shell on this host. Otherwise: document as known-good parent/child pair and add to the host's allowlist.
 
 ### Response Actions
+
 - Contain: isolate the host if command line shows download/execute behavior.
 - Notify: escalate to IR if a web server or Office parent is confirmed malicious.
 - Document: log the parent/child pair and disposition in the allowlist notes.
-
----
-
-## 2. Registry Run Key Persistence
-
-**MITRE ATT&CK:** T1547.001
-**Trigger:** Write to `Run`/`RunOnce`/`Explorer\Run` registry keys — see `detections.md` #2
-**Data source:** Sysmon Event ID 12/13
-
-### Triage Steps
-1. Identify the writing process (`Image`) and the exact `TargetObject`/`Details` value written.
-2. Check whether `Image` matches a known software installer that was actively being run around the same time (check install logs / recent Downloads).
-3. Look up the binary path referenced in `Details` — is it in a standard install location or a suspicious path (Temp, AppData, Public)?
-4. Check for related process creation (Sysmon Event ID 1) from the same `Image` immediately before the registry write.
-
-### False-Positive Checks
-- Legitimate installers (browsers, update agents, printer drivers) commonly add Run key entries.
-- Enterprise software that self-registers for startup is expected — check the host's baseline before treating as suspicious.
-
-### Escalation Threshold
-Escalate if: the referenced binary path is in a non-standard location, unsigned, or was recently dropped by another process (e.g., a downloader).
-Otherwise: close as benign install-time behavior if the binary and path match known software.
-
-### Response Actions
-- Contain: if the binary is confirmed malicious, isolate host and prevent execution (kill process, block hash via EDR).
-- Notify: escalate to IR if the entry ties back to a broader intrusion (e.g., preceded by suspicious PowerShell).
-- Document: record the registry value, binary path, and hash for the case file.
-
 ---
 
 ## 3. Multiple Failed Logins
