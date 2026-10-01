@@ -94,25 +94,31 @@ Otherwise: monitor if it's a known user's manual retry pattern that stops withou
 
 ## 4. PowerShell Encoded Command / Suspicious Execution
 
-**MITRE ATT&CK:** T1059.001, T1027, T1105
-**Trigger:** `-enc`/`-EncodedCommand` usage or `Invoke-WebRequest`/`DownloadString`/`DownloadFile` calls — see `detections.md` #4
-**Data source:** Sysmon Event ID 1
+**MITRE ATT&CK:** T1059.001, T1027, T1105 **Trigger:** `-enc`/`-EncodedCommand` usage or `Invoke-WebRequest`/`DownloadString`/`DownloadFile` calls — see `detections.md` #4 **Data source:** Sysmon Event ID 1
 
 ### Triage Steps
-1. Decode the Base64 payload (CyberChef or `[System.Convert]::FromBase64String`) to see the actual command.
-2. Identify the parent process — is this consistent with detection #1 (suspicious parent) or a user-initiated shell?
-3. If a download cradle is present, extract the URL/domain and check it against threat intel (VirusTotal, OTX) before it's blocked at the firewall.
-4. Check for a resulting child process or outbound network connection immediately after execution (pivot to Sysmon Event ID 3).
+
+1. Pull hostname, timestamp, `User`, `Image`, `CommandLine`, `ParentImage`, `ParentCommandLine`, `ProcessGuid`, and `ParentProcessGuid` from the alert.
+2. Decode the Base64 payload (CyberChef or `[System.Convert]::FromBase64String`) to see the actual command.
+3. Identify the parent process — is this consistent with detection #1 (suspicious parent) or a user-initiated shell?
+4. If a download cradle is present, extract the URL/domain and check it against threat intel (VirusTotal, OTX).
+5. Check for resulting child processes in Sysmon Event ID 1 whose `ParentProcessGuid` matches the PowerShell `ProcessGuid`. Check outbound network connections in Sysmon Event ID 3 using the same `ProcessGuid`, where collected.
+6. Check available PowerShell 4104/4103 logs and EDR telemetry for suspicious activity within the PowerShell process itself. Malicious code can execute in memory without creating a child process or dropping an executable.
+7. Scope the activity across other hosts and users for the same command, script/file hash, URL/domain/IP, or process chain. Check related alerts and persistence activity around the same timestamp, then expand the time window as needed.
 
 ### False-Positive Checks
+
 - Legitimate admin scripts that use encoded commands to avoid shell quoting issues (rare but happens in some automation frameworks — verify against known scheduled tasks).
 - Software update mechanisms that use `Invoke-WebRequest` internally.
 
 ### Escalation Threshold
-Escalate if: the decoded command references an external domain not on an allowlist, downloads and executes a binary, or was spawned from a suspicious parent (ties to detection #1).
-Otherwise: document as known automation if the decoded content and destination are verified benign.
+
+Escalate if: the decoded command references an external domain not on an allowlist, downloads and executes a binary, shows suspicious in-memory execution, or was spawned from a suspicious parent (ties to detection #1). Otherwise: document as known automation if the decoded content, destination, and related activity are verified benign.
+
+**Do not close solely because no child process or downloaded binary was observed.** If important telemetry is missing and the activity remains unexplained, escalate for further investigation.
 
 ### Response Actions
+
 - Contain: isolate host, block the destination domain/IP at the firewall.
-- Notify: escalate to IR if a binary was downloaded and executed.
-- Document: preserve the decoded command, destination, and any dropped file hashes for the case file.
+- Notify: escalate to IR if a binary was downloaded and executed or malicious execution within PowerShell is identified.
+- Document: preserve the original and decoded command, destination, process identifiers, scoping results, and any dropped file hashes for the case file.
