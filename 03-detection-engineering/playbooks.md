@@ -65,6 +65,33 @@ Escalate if: the PowerShell command line contains encoded commands, download cra
 - Document: log the parent/child pair and disposition in the allowlist notes.
 ---
 
+## 2. Registry Run Key Persistence
+
+**MITRE ATT&CK:** T1547.001
+**Trigger:** Write to `Run`/`RunOnce`/`Explorer\Run` registry keys — see `detections.md` #2
+**Data source:** Sysmon Event ID 12/13
+
+### Triage Steps
+1. Identify the writing process (`Image`) and the exact `TargetObject`/`Details` value written.
+2. Check whether `Image` matches a known software installer that was actively being run around the same time (check install logs / recent Downloads).
+3. Look up the binary path referenced in `Details` — is it in a standard install location or a suspicious path (Temp, AppData, Public)?
+4. Check for related process creation (Sysmon Event ID 1) from the same `Image` immediately before the registry write.
+
+### False-Positive Checks
+- Legitimate installers (browsers, update agents, printer drivers) commonly add Run key entries.
+- Enterprise software that self-registers for startup is expected — check the host's baseline before treating as suspicious.
+
+### Escalation Threshold
+Escalate if: the referenced binary path is in a non-standard location, unsigned, or was recently dropped by another process (e.g., a downloader).
+Otherwise: close as benign install-time behavior if the binary and path match known software.
+
+### Response Actions
+- Contain: if the binary is confirmed malicious, isolate host and prevent execution (kill process, block hash via EDR).
+- Notify: escalate to IR if the entry ties back to a broader intrusion (e.g., preceded by suspicious PowerShell).
+- Document: record the registry value, binary path, and hash for the case file.
+---
+  
+
 ## 3. Multiple Failed Logins
 
 **MITRE ATT&CK:** T1110
