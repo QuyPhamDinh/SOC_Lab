@@ -99,12 +99,11 @@ Otherwise: monitor if it's a known user's manual retry pattern that stops withou
 ### Triage Steps
 
 1. Pull hostname, timestamp, `User`, `Image`, `CommandLine`, `ParentImage`, `ParentCommandLine`, `ProcessGuid`, and `ParentProcessGuid` from the alert.
-2. Decode the Base64 payload (CyberChef or `[System.Convert]::FromBase64String`) to see the actual command.
+2. Decode any Base64 payload without executing it and inspect the actual command. Review available PowerShell 4104/4103 logs and EDR telemetry for suspicious behavior, including in-memory execution that may not create a child process or drop an executable.
 3. Identify the parent process — is this consistent with detection #1 (suspicious parent) or a user-initiated shell?
 4. If a download cradle is present, extract the URL/domain and check it against threat intel (VirusTotal, OTX).
 5. Check for resulting child processes in Sysmon Event ID 1 whose `ParentProcessGuid` matches the PowerShell `ProcessGuid`. Check outbound network connections in Sysmon Event ID 3 using the same `ProcessGuid`, where collected.
-6. Check available PowerShell 4104/4103 logs and EDR telemetry for suspicious activity within the PowerShell process itself. Malicious code can execute in memory without creating a child process or dropping an executable.
-7. Scope the activity across other hosts and users for the same command, script/file hash, URL/domain/IP, or process chain. Check related alerts and persistence activity around the same timestamp, then expand the time window as needed.
+6. Scope the activity across other hosts and users for the same command, script/file hash, URL/domain/IP, or process chain. Check related alerts and persistence activity around the same timestamp, then expand the time window as needed.
 
 ### False-Positive Checks
 
